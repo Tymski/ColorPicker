@@ -44,7 +44,7 @@
             }
         }
 
-        /* Left Column: Preview & Hex */
+        /* Left Column: Preview & Code Input */
         .col-left {
             display: flex;
             flex-direction: column;
@@ -67,27 +67,70 @@
             height: 100%;
             background-color: rgba(255, 0, 85, 1);
             transition: background-color 0.1s ease;
+            color:hwb(0 0% 100% / 0.06)
         }
 
-        .hex-control {
+        .code-control {
             background-color: #374151; /* gray-700 */
             border-radius: 0.5rem;
-            padding: 1rem;
+            padding: 0.5rem;
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
+            flex-direction: column;
+            gap: 0.5rem;
         }
 
-        #hex-input {
+        .input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .format-switcher {
+            display: flex;
+            background-color: #1f2937; /* gray-800 */
+            border-radius: 0.375rem;
+            padding: 2px;
+            flex-shrink: 0;
+            align-self: flex-start;
+        }
+
+        .format-btn {
+            background: transparent;
+            border: none;
+            color: #d1d5db; /* gray-300 */
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: background-color 0.2s, color 0.2s;
+            white-space: nowrap;
+        }
+
+        .format-btn:hover {
+            background-color: #4b5563; /* gray-600 */
+        }
+
+        .format-btn.active {
+            background-color: #4f46e5; /* indigo-600 */
+            color: white;
+        }
+
+        .format-btn.active:hover {
+            background-color: #6366f1; /* indigo-500 */
+        }
+
+        #color-code-input {
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
             font-size: 1.125rem;
-            color: #d1d5db; /* gray-300 */
+            color: white;
             background: transparent;
             border: none;
             outline: none;
             width: 100%;
             text-transform: uppercase;
+            padding-left: 0.5rem;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
         }
 
         #copy-btn {
@@ -101,6 +144,7 @@
             cursor: pointer;
             transition: background-color 0.2s;
             white-space: nowrap;
+            flex-shrink: 0;
         }
 
         #copy-btn:hover {
@@ -264,9 +308,16 @@
             <div class="preview-container">
                 <div id="color-preview"></div>
             </div>
-            <div class="hex-control">
-                <input type="text" id="hex-input" spellcheck="false" aria-label="Hex color code input">
-                <button id="copy-btn">Copy</button>
+            <div class="code-control">
+                <div class="format-switcher">
+                    <button class="format-btn active" data-mode="hex">HEX</button>
+                    <button class="format-btn" data-mode="rgb">RGB</button>
+                    <button class="format-btn" data-mode="hsl">HSL</button>
+                </div>
+                <div class="input-wrapper">
+                    <input type="text" id="color-code-input" spellcheck="false" aria-label="Color code input">
+                    <button id="copy-btn">Copy</button>
+                </div>
             </div>
         </div>
 
@@ -425,10 +476,65 @@
             return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
         }
 
+        function rgbToHsl(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            let max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h = 0, s = 0, l = (max + min) / 2;
+            if (max !== min) {
+                let d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            return { h: h * 360, s: s * 100, l: l * 100 };
+        }
+
+        function hslToRgb(h, s, l) {
+            s /= 100; l /= 100;
+            let c = (1 - Math.abs(2 * l - 1)) * s,
+                x = c * (1 - Math.abs((h / 60) % 2 - 1)),
+                m = l - c/2,
+                r = 0, g = 0, b = 0;
+            if (0 <= h && h < 60) { r = c; g = x; b = 0; }
+            else if (60 <= h && h < 120) { r = x; g = c; b = 0; }
+            else if (120 <= h && h < 180) { r = 0; g = c; b = x; }
+            else if (180 <= h && h < 240) { r = 0; g = x; b = c; }
+            else if (240 <= h && h < 300) { r = x; g = 0; b = c; }
+            else if (300 <= h && h < 360) { r = c; g = 0; b = x; }
+            r = Math.round((r + m) * 255);
+            g = Math.round((g + m) * 255);
+            b = Math.round((b + m) * 255);
+            return { r, g, b };
+        }
+
         function rgbaToHex(r, g, b, a) {
             const toHex = (c) => Math.round(c).toString(16).padStart(2, '0');
             const alphaHex = toHex(a * 255);
             return `#${toHex(r)}${toHex(g)}${toHex(b)}${alphaHex}`.toUpperCase();
+        }
+        
+        function rgbaToRgbString(r, g, b, a) {
+            if (a === 1) {
+                return `RGB(${r}, ${g}, ${b})`;
+            } else {
+                return `RGBA(${r}, ${g}, ${b}, ${a.toFixed(2)})`;
+            }
+        }
+
+        function rgbaToHslString(r, g, b, a) {
+            const hsl = rgbToHsl(r, g, b);
+            const h = Math.round(hsl.h);
+            const s = Math.round(hsl.s);
+            const l = Math.round(hsl.l);
+            if (a === 1) {
+                return `HSL(${h}, ${s}%, ${l}%)`;
+            } else {
+                return `HSLA(${h}, ${s}%, ${l}%, ${a.toFixed(2)})`;
+            }
         }
 
         function hexToRgba(hex) {
@@ -452,13 +558,15 @@
         
         // Initial State
         const state = {
-            rgba: { r: 255, g: 0, b: 85, a: 1 }
+            rgba: { r: 255, g: 0, b: 85, a: 1 },
+            colorMode: 'hex'
         };
 
         // DOM Elements
         const els = {
             preview: document.getElementById('color-preview'),
-            hexInput: document.getElementById('hex-input'),
+            colorCodeInput: document.getElementById('color-code-input'),
+            formatBtns: document.querySelectorAll('.format-btn'),
             copyBtn: document.getElementById('copy-btn'),
             
             // Gradients
@@ -485,14 +593,23 @@
         function updateUI(updateInputs = true) {
             const { r, g, b, a } = state.rgba;
             const hsv = rgbToHsv(r, g, b);
-            const hex = rgbaToHex(r, g, b, a);
 
             // 1. Preview
             els.preview.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${a})`;
 
-            // 2. Hex Input (only if not focused or if triggered explicitly)
-            if (document.activeElement !== els.hexInput) {
-                els.hexInput.value = hex;
+            // 2. Color Code Input
+            if (document.activeElement !== els.colorCodeInput) {
+                switch(state.colorMode) {
+                    case 'hex':
+                        els.colorCodeInput.value = rgbaToHex(r, g, b, a);
+                        break;
+                    case 'rgb':
+                        els.colorCodeInput.value = rgbaToRgbString(r, g, b, a);
+                        break;
+                    case 'hsl':
+                        els.colorCodeInput.value = rgbaToHslString(r, g, b, a);
+                        break;
+                }
             }
 
             // 3. Dynamic Gradients
@@ -603,30 +720,76 @@
         // Bind all sliders
         Object.keys(els.inputs).forEach(setupSliderEvents);
 
-        // Hex Input Logic
-        const handleHexChange = () => {
-            const parsed = hexToRgba(els.hexInput.value);
-            if (parsed) {
-                state.rgba = parsed;
+        // Color Code Input Logic
+        function handleColorCodeChange() {
+            const input = els.colorCodeInput.value.trim();
+            let parsedRgba = null;
+
+            switch (state.colorMode) {
+                case 'hex':
+                    parsedRgba = hexToRgba(input);
+                    break;
+                case 'rgb': {
+                    const match = input.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/i);
+                    if (match) {
+                        parsedRgba = {
+                            r: parseInt(match[1], 10),
+                            g: parseInt(match[2], 10),
+                            b: parseInt(match[3], 10),
+                            a: match[4] !== undefined ? parseFloat(match[4]) : 1
+                        };
+                    }
+                    break;
+                }
+                case 'hsl': {
+                    const match = input.match(/hsla?\((\d+),\s*(\d+)%?,\s*(\d+)%?(?:,\s*([\d.]+))?\)/i);
+                    if (match) {
+                        const rgb = hslToRgb(parseInt(match[1], 10), parseInt(match[2], 10), parseInt(match[3], 10));
+                        parsedRgba = {
+                            ...rgb,
+                            a: match[4] !== undefined ? parseFloat(match[4]) : 1
+                        };
+                    }
+                    break;
+                }
+            }
+            
+            if (parsedRgba) {
+                // Clamp values to be safe
+                parsedRgba.r = Math.max(0, Math.min(255, parsedRgba.r));
+                parsedRgba.g = Math.max(0, Math.min(255, parsedRgba.g));
+                parsedRgba.b = Math.max(0, Math.min(255, parsedRgba.b));
+                parsedRgba.a = Math.max(0, Math.min(1, parsedRgba.a));
+                state.rgba = parsedRgba;
                 updateUI();
             } else {
                 // Revert if invalid
                 updateUI();
             }
-        };
+        }
 
-        els.hexInput.addEventListener('keydown', (e) => {
+        els.colorCodeInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
-                handleHexChange();
-                els.hexInput.blur();
+                handleColorCodeChange();
+                els.colorCodeInput.blur();
             }
         });
-        els.hexInput.addEventListener('blur', handleHexChange);
+        els.colorCodeInput.addEventListener('blur', handleColorCodeChange);
+
+        // Format Switcher Logic
+        els.formatBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                els.formatBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.colorMode = btn.dataset.mode;
+                updateUI(false); // Update input display without touching sliders
+            });
+        });
 
         // Copy Button Logic
         els.copyBtn.addEventListener('click', () => {
-            const hex = rgbaToHex(state.rgba.r, state.rgba.g, state.rgba.b, state.rgba.a);
-            navigator.clipboard.writeText(hex).then(() => {
+            const textToCopy = els.colorCodeInput.value;
+            navigator.clipboard.writeText(textToCopy).then(() => {
                 els.copyBtn.textContent = 'Copied!';
                 setTimeout(() => els.copyBtn.textContent = 'Copy', 2000);
             });
