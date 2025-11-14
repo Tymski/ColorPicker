@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vanilla Color Picker</title>
+    <style>
+        /* Reset & Base Styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #111827; /* gray-900 */
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Utility Classes & Layout */
+        .card {
+            background-color: #1f2937; /* gray-800 */
+            width: 100%;
+            max-width: 56rem; /* 4xl */
+            border-radius: 0.75rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            padding: 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 1024px) {
+            .card {
+                grid-template-columns: 1fr 1fr;
+                padding: 2rem;
+            }
+        }
+
+        /* Left Column: Preview & Hex */
+        .col-left {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .preview-container {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border-radius: 0.5rem;
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+            /* Checkerboard pattern for alpha */
+            background-image: repeating-conic-gradient(#374151 0% 25%, #4b5563 0% 50%);
+            background-size: 20px 20px;
+        }
+
+        #color-preview {
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 0, 85, 1);
+            transition: background-color 0.1s ease;
+        }
+
+        .hex-control {
+            background-color: #374151; /* gray-700 */
+            border-radius: 0.5rem;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        #hex-input {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 1.125rem;
+            color: #d1d5db; /* gray-300 */
+            background: transparent;
+            border: none;
+            outline: none;
+            width: 100%;
+            text-transform: uppercase;
+        }
+
+        #copy-btn {
+            padding: 0.5rem 1rem;
+            background-color: #4f46e5; /* indigo-600 */
+            color: white;
+            border: 1px solid rgba(0,0,0,0.3);
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            white-space: nowrap;
+        }
+
+        #copy-btn:hover {
+            background-color: #6366f1; /* indigo-500 */
+        }
+
+        /* Right Column: Sliders */
+        .col-right {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .divider {
+            border-top: 1px solid #374151;
+            margin: 0.5rem 0;
+        }
+
+        /* Slider Row Component */
+        .slider-row {
+            display: grid;
+            grid-template-columns: 20px 1fr auto; /* Label | Slider | Controls */
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .slider-label {
+            font-family: ui-monospace, monospace;
+            font-size: 0.875rem;
+            color: #e5e7eb;
+            text-align: center;
+        }
+
+        .slider-track-container {
+            position: relative;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .slider-gradient {
+            position: absolute;
+            width: 100%;
+            height: 1.5rem; /* h-6 */
+            border-radius: 9999px;
+            overflow: hidden;
+            z-index: 0;
+        }
+
+        .slider-gradient.is-alpha {
+            background-image: repeating-conic-gradient(#374151 0% 25%, #4b5563 0% 50%);
+            background-size: 10px 10px;
+        }
+
+        .slider-gradient-overlay {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Range Input Styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            position: relative;
+            width: 100%;
+            height: 1.5rem;
+            background: transparent;
+            cursor: pointer;
+            z-index: 1;
+            margin: 0;
+        }
+        
+        input[type="range"]:focus {
+            outline: none;
+        }
+
+        /* Thumb Styling (Webkit) */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 28px;
+            height: 28px;
+            background: #cbd5e1; /* thumb color */
+            border: 3px solid #1f2937; /* gray-800 */
+            border-radius: 50%;
+            cursor: pointer;
+            margin-top: 0; /* Centered by flex container usually, usually doesn't need offset if height matches */
+            box-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+
+        /* Thumb Styling (Firefox) */
+        input[type="range"]::-moz-range-thumb {
+            width: 28px;
+            height: 28px;
+            background: #cbd5e1;
+            border: 3px solid #1f2937;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+
+        /* Controls Group (Input + Buttons) */
+        .controls-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .adjust-btn {
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #4b5563; /* gray-600 */
+            color: #d1d5db;
+            border: 1px solid rgba(0,0,0,0.3);
+            border-radius: 0.25rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+
+        .adjust-btn:hover {
+            background-color: #6b7280;
+        }
+
+        .num-input {
+            width: 3.5rem;
+            background-color: #374151; /* gray-700 */
+            color: white;
+            text-align: center;
+            border-radius: 0.25rem;
+            padding: 0.25rem;
+            font-family: ui-monospace, monospace;
+            font-size: 0.875rem;
+            border: none;
+            -moz-appearance: textfield;
+        }
+        
+        .num-input::-webkit-outer-spin-button,
+        .num-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <!-- Left Panel -->
+        <div class="col-left">
+            <div class="preview-container">
+                <div id="color-preview"></div>
+            </div>
+            <div class="hex-control">
+                <input type="text" id="hex-input" spellcheck="false" aria-label="Hex color code input">
+                <button id="copy-btn">Copy</button>
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="col-right">
+            
+            <!-- HSV Sliders -->
+            <div class="slider-row" id="row-h">
+                <span class="slider-label">H</span>
+                <div class="slider-track-container">
+                    <div class="slider-gradient">
+                        <div class="slider-gradient-overlay" style="background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);"></div>
+                    </div>
+                    <input type="range" min="0" max="360" data-type="h">
+                </div>
+                <div class="controls-group">
+                    <button class="adjust-btn" data-action="dec">-</button>
+                    <input type="number" class="num-input" min="0" max="360" data-type="h">
+                    <button class="adjust-btn" data-action="inc">+</button>
+                </div>
+            </div>
+
+            <div class="slider-row" id="row-s">
+                <span class="slider-label">S</span>
+                <div class="slider-track-container">
+                    <div class="slider-gradient">
+                        <div class="slider-gradient-overlay" id="grad-s"></div>
+                    </div>
+                    <input type="range" min="0" max="100" data-type="s">
+                </div>
+                <div class="controls-group">
+                    <button class="adjust-btn" data-action="dec">-</button>
+                    <input type="number" class="num-input" min="0" max="100" data-type="s">
+                    <button class="adjust-btn" data-action="inc">+</button>
+                </div>
+            </div>
+
+            <div class="slider-row" id="row-v">
+                <span class="slider-label">V</span>
+                <div class="slider-track-container">
+                    <div class="slider-gradient">
+                        <div class="slider-gradient-overlay" id="grad-v"></div>
+                    </div>
+                    <input type="range" min="0" max="100" data-type="v">
+                </div>
+                <div class="controls-group">
+                    <button class="adjust-btn" data-action="dec">-</button>
+                    <input type="number" class="num-input" min="0" max="100" data-type="v">
+                    <button class="adjust-btn" data-action="inc">+</button>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- RGB Sliders -->
+            <div class="slider-row" id="row-r">
+                <span class="slider-label">R</span>
+                <div class="slider-track-container">
+                    <div class="slider-gradient">
+                        <div class="slider-gradient-overlay" id="grad-r"></div>
+                    </div>
+                    <input type="range" min="0" max="255" data-type="r">
+                </div>
+                <div class="controls-group">
+                    <button class="adjust-btn" data-action="dec">-</button>
+                    <input type="number" class="num-input" min="0" max="255" data-type="r">
+                    <button class="adjust-btn" data-action="inc">+</button>
+                </div>
+            </div>
+
+            <div class="slider-row" id="row-g">
+                <span class="slider-label">G</span>
+                <div class="slider-track-container">
+                    <div class="slider-gradient">
+                        <div class="slider-gradient-overlay" id="grad-g"></div>
+                    </div>
+                    <input type="range" min="0" max="255" data-type="g">
+                </div>
+                <div class="controls-group">
+                    <button class="adjust-btn" data-action="dec">-</button>
+                    <input type="number" class="num-input" min="0" max="255" data-type="g">
+                    <button class="adjust-btn" data-action="inc">+</button>
+                </div>
+            </div>
+
+            <div class="slider-row" id="row-b">
+                <span class="slider-label">B</span>
+                <div class="slider-track-container">
+                    <div class="slider-gradient">
+                        <div class="slider-gradient-overlay" id="grad-b"></div>
+                    </div>
+                    <input type="range" min="0" max="255" data-type="b">
+                </div>
+                <div class="controls-group">
+                    <button class="adjust-btn" data-action="dec">-</button>
+                    <input type="number" class="num-input" min="0" max="255" data-type="b">
+                    <button class="adjust-btn" data-action="inc">+</button>
+                </div>
+            </div>
+
+            <div class="slider-row" id="row-a">
+                <span class="slider-label">A</span>
+                <div class="slider-track-container">
+                    <div class="slider-gradient is-alpha">
+                        <div class="slider-gradient-overlay" id="grad-a"></div>
+                    </div>
+                    <input type="range" min="0" max="100" data-type="a">
+                </div>
+                <div class="controls-group">
+                    <button class="adjust-btn" data-action="dec">-</button>
+                    <input type="number" class="num-input" min="0" max="100" data-type="a">
+                    <button class="adjust-btn" data-action="inc">+</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Color Utilities (Ported from Typescript)
+         */
+        function rgbToHsv(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            let max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h = 0, s = 0, v = max;
+            let d = max - min;
+            s = max === 0 ? 0 : d / max;
+            if (max !== min) {
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            return { h: h * 360, s: s * 100, v: v * 100 };
+        }
+
+        function hsvToRgb(h, s, v) {
+            s /= 100; v /= 100; h /= 360;
+            let r = 0, g = 0, b = 0;
+            let i = Math.floor(h * 6);
+            let f = h * 6 - i;
+            let p = v * (1 - s);
+            let q = v * (1 - f * s);
+            let t = v * (1 - (1 - f) * s);
+            switch (i % 6) {
+                case 0: r = v; g = t; b = p; break;
+                case 1: r = q; g = v; b = p; break;
+                case 2: r = p; g = v; b = t; break;
+                case 3: r = p; g = q; b = v; break;
+                case 4: r = t; g = p; b = v; break;
+                case 5: r = v; g = p; b = q; break;
+            }
+            return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
+        }
+
+        function rgbaToHex(r, g, b, a) {
+            const toHex = (c) => Math.round(c).toString(16).padStart(2, '0');
+            const alphaHex = toHex(a * 255);
+            return `#${toHex(r)}${toHex(g)}${toHex(b)}${alphaHex}`.toUpperCase();
+        }
+
+        function hexToRgba(hex) {
+            if (!hex) return null;
+            let cleanHex = hex.startsWith('#') ? hex.slice(1) : hex;
+            if (cleanHex.length === 3) cleanHex = cleanHex.split('').map(c => c + c).join('');
+            if (cleanHex.length === 4) cleanHex = cleanHex.split('').map(c => c + c).join('');
+            if (cleanHex.length !== 6 && cleanHex.length !== 8) return null;
+            if (/[^0-9a-f]/i.test(cleanHex)) return null;
+
+            const r = parseInt(cleanHex.substring(0, 2), 16);
+            const g = parseInt(cleanHex.substring(2, 4), 16);
+            const b = parseInt(cleanHex.substring(4, 6), 16);
+            const a = cleanHex.length === 8 ? parseInt(cleanHex.substring(6, 8), 16) / 255 : 1;
+            return { r, g, b, a };
+        }
+
+        /**
+         * Application State & Logic
+         */
+        
+        // Initial State
+        const state = {
+            rgba: { r: 255, g: 0, b: 85, a: 1 }
+        };
+
+        // DOM Elements
+        const els = {
+            preview: document.getElementById('color-preview'),
+            hexInput: document.getElementById('hex-input'),
+            copyBtn: document.getElementById('copy-btn'),
+            
+            // Gradients
+            gradS: document.getElementById('grad-s'),
+            gradV: document.getElementById('grad-v'),
+            gradR: document.getElementById('grad-r'),
+            gradG: document.getElementById('grad-g'),
+            gradB: document.getElementById('grad-b'),
+            gradA: document.getElementById('grad-a'),
+            
+            // Inputs Groups mapped by type
+            inputs: {
+                h: { range: document.querySelector('input[type="range"][data-type="h"]'), num: document.querySelector('input.num-input[data-type="h"]') },
+                s: { range: document.querySelector('input[type="range"][data-type="s"]'), num: document.querySelector('input.num-input[data-type="s"]') },
+                v: { range: document.querySelector('input[type="range"][data-type="v"]'), num: document.querySelector('input.num-input[data-type="v"]') },
+                r: { range: document.querySelector('input[type="range"][data-type="r"]'), num: document.querySelector('input.num-input[data-type="r"]') },
+                g: { range: document.querySelector('input[type="range"][data-type="g"]'), num: document.querySelector('input.num-input[data-type="g"]') },
+                b: { range: document.querySelector('input[type="range"][data-type="b"]'), num: document.querySelector('input.num-input[data-type="b"]') },
+                a: { range: document.querySelector('input[type="range"][data-type="a"]'), num: document.querySelector('input.num-input[data-type="a"]') },
+            }
+        };
+
+        // Update UI
+        function updateUI(updateInputs = true) {
+            const { r, g, b, a } = state.rgba;
+            const hsv = rgbToHsv(r, g, b);
+            const hex = rgbaToHex(r, g, b, a);
+
+            // 1. Preview
+            els.preview.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${a})`;
+
+            // 2. Hex Input (only if not focused or if triggered explicitly)
+            if (document.activeElement !== els.hexInput) {
+                els.hexInput.value = hex;
+            }
+
+            // 3. Dynamic Gradients
+            // Saturation: from white (at current V) to pure color (at current H, V)
+            els.gradS.style.background = `linear-gradient(to right, hsl(${hsv.h}, 0%, ${hsv.v}%), hsl(${hsv.h}, 100%, ${hsv.v / 2}%))`;
+            // Value: from black to pure color (at current H)
+            els.gradV.style.background = `linear-gradient(to right, #000, hsl(${hsv.h}, 100%, 50%))`;
+            
+            els.gradR.style.background = `linear-gradient(to right, rgb(0, ${g}, ${b}), rgb(255, ${g}, ${b}))`;
+            els.gradG.style.background = `linear-gradient(to right, rgb(${r}, 0, ${b}), rgb(${r}, 255, ${b}))`;
+            els.gradB.style.background = `linear-gradient(to right, rgb(${r}, ${g}, 0), rgb(${r}, ${g}, 255))`;
+            els.gradA.style.background = `linear-gradient(to right, rgba(${r}, ${g}, ${b}, 0), rgba(${r}, ${g}, ${b}, 1))`;
+
+            // 4. Update Sliders & Number Inputs
+            if (updateInputs) {
+                const values = {
+                    h: Math.round(hsv.h),
+                    s: Math.round(hsv.s),
+                    v: Math.round(hsv.v),
+                    r: r,
+                    g: g,
+                    b: b,
+                    a: Math.round(a * 100)
+                };
+
+                for (const key in els.inputs) {
+                    const group = els.inputs[key];
+                    // Only update if not currently being dragged/typed into to avoid jitter
+                    if (document.activeElement !== group.range && document.activeElement !== group.num) {
+                        group.range.value = values[key];
+                        group.num.value = values[key];
+                    }
+                }
+            }
+        }
+
+        // Handlers
+        function setRgba(newParts) {
+            state.rgba = { ...state.rgba, ...newParts };
+            updateUI();
+        }
+
+        function setHsv(hsvPart) {
+            const currentHsv = rgbToHsv(state.rgba.r, state.rgba.g, state.rgba.b);
+            const newHsv = { ...currentHsv, ...hsvPart };
+            const newRgb = hsvToRgb(newHsv.h, newHsv.s, newHsv.v);
+            setRgba(newRgb);
+        }
+
+        // Event Listeners Setup
+        function setupSliderEvents(type) {
+            const group = els.inputs[type];
+            const isRgba = ['r', 'g', 'b', 'a'].includes(type);
+
+            const update = (val) => {
+                val = parseFloat(val);
+                if (isNaN(val)) return;
+
+                if (isRgba) {
+                    if (type === 'a') setRgba({ a: val / 100 });
+                    else setRgba({ [type]: val });
+                } else {
+                    setHsv({ [type]: val });
+                }
+                // Manually sync the pair (range <-> num) so they move together instantly
+                group.range.value = val;
+                group.num.value = val;
+            };
+
+            // Range Input
+            group.range.addEventListener('input', (e) => update(e.target.value));
+            
+            // Number Input
+            group.num.addEventListener('input', (e) => update(e.target.value));
+            group.num.addEventListener('change', () => updateUI(true)); // Correct formatting on blur
+
+            // Buttons
+            const row = group.range.closest('.slider-row');
+            const decBtn = row.querySelector('[data-action="dec"]');
+            const incBtn = row.querySelector('[data-action="inc"]');
+
+            decBtn.addEventListener('click', () => {
+                let val = parseFloat(group.num.value);
+                let min = parseFloat(group.num.min);
+                if (val > min) update(val - 1);
+            });
+
+            incBtn.addEventListener('click', () => {
+                let val = parseFloat(group.num.value);
+                let max = parseFloat(group.num.max);
+                if (val < max) update(val + 1);
+            });
+        }
+
+        // Bind all sliders
+        Object.keys(els.inputs).forEach(setupSliderEvents);
+
+        // Hex Input Logic
+        const handleHexChange = () => {
+            const parsed = hexToRgba(els.hexInput.value);
+            if (parsed) {
+                state.rgba = parsed;
+                updateUI();
+            } else {
+                // Revert if invalid
+                updateUI();
+            }
+        };
+
+        els.hexInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                handleHexChange();
+                els.hexInput.blur();
+            }
+        });
+        els.hexInput.addEventListener('blur', handleHexChange);
+
+        // Copy Button Logic
+        els.copyBtn.addEventListener('click', () => {
+            const hex = rgbaToHex(state.rgba.r, state.rgba.g, state.rgba.b, state.rgba.a);
+            navigator.clipboard.writeText(hex).then(() => {
+                els.copyBtn.textContent = 'Copied!';
+                setTimeout(() => els.copyBtn.textContent = 'Copy', 2000);
+            });
+        });
+
+        // Initialize
+        updateUI();
+
+    </script>
+</body>
+</html>
